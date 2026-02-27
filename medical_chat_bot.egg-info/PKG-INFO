@@ -1,0 +1,11 @@
+Metadata-Version: 2.4
+Name: medical-chat-bot
+Version: 0.1.0
+Author: Sarthak Deshmukh
+Author-email: sarthakdeshmukh009@gmail.com
+Requires-Python: >=3.10
+License-File: LICENSE
+Dynamic: author
+Dynamic: author-email
+Dynamic: license-file
+Dynamic: requires-python

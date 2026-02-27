@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MedBot — Your Health Assistant</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Fraunces:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
+  <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}"/>
+  <!-- jQuery — required for $.ajax -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="avatar-wrap">
+      <div class="bot-icon-lg">
+        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="10" y="20" width="44" height="34" rx="12" fill="white" opacity=".95"/>
+          <line x1="32" y1="20" x2="32" y2="10" stroke="white" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="32" cy="8" r="4" fill="#34d399"/>
+          <rect x="18" y="30" width="9" height="9" rx="3" fill="#1a7f5e"/>
+          <rect x="37" y="30" width="9" height="9" rx="3" fill="#1a7f5e"/>
+          <rect x="20" y="32" width="3" height="3" rx="1" fill="white" opacity=".6"/>
+          <rect x="39" y="32" width="3" height="3" rx="1" fill="white" opacity=".6"/>
+          <path d="M22 44 Q32 50 42 44" stroke="#1a7f5e" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+          <rect x="29" y="16" width="6" height="6" rx="1" fill="#34d399" opacity=".0"/>
+          <rect x="6" y="28" width="5" height="10" rx="3" fill="white" opacity=".7"/>
+          <rect x="53" y="28" width="5" height="10" rx="3" fill="white" opacity=".7"/>
+        </svg>
+      </div>
+      <span class="status-dot"></span>
+    </div>
+    <div class="header-text">
+      <h1>MedBot</h1>
+      <p>Always here, always available</p>
+    </div>
+    <span class="header-badge">● Online</span>
+  </header>
+
+  <!-- Quick chips -->
+  <div class="chips-bar" id="chipsBar">
+    <button class="chip" data-msg="What are common cold symptoms?">🤧 Cold symptoms</button>
+    <button class="chip" data-msg="How to lower blood pressure naturally?">❤️ Blood pressure</button>
+    <button class="chip" data-msg="What vitamins should I take daily?">💊 Daily vitamins</button>
+    <button class="chip" data-msg="How much water should I drink per day?">💧 Hydration tips</button>
+    <button class="chip" data-msg="What are signs of anxiety?">🧠 Anxiety signs</button>
+  </div>
+
+  <!-- Messages -->
+  <div class="messages" id="messages">
+    <div class="empty-state" id="emptyState">
+      <div class="icon">
+        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-svg">
+          <rect x="10" y="20" width="44" height="34" rx="12" fill="#1a7f5e"/>
+          <line x1="32" y1="20" x2="32" y2="10" stroke="#1a7f5e" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="32" cy="8" r="4" fill="#34d399"/>
+          <rect x="18" y="30" width="9" height="9" rx="3" fill="white"/>
+          <rect x="37" y="30" width="9" height="9" rx="3" fill="white"/>
+          <rect x="20" y="32" width="3" height="3" rx="1" fill="#1a7f5e" opacity=".5"/>
+          <rect x="39" y="32" width="3" height="3" rx="1" fill="#1a7f5e" opacity=".5"/>
+          <path d="M22 44 Q32 50 42 44" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+          <rect x="6" y="28" width="5" height="10" rx="3" fill="#1a7f5e"/>
+          <rect x="53" y="28" width="5" height="10" rx="3" fill="#1a7f5e"/>
+        </svg>
+      </div>
+      <h2>How can I help today?</h2>
+      <p>Ask me about symptoms, medications, wellness tips, or any health question you have.</p>
+    </div>
+  </div>
+
+  <!-- Typing indicator -->
+  <div class="typing-wrap">
+    <div class="typing-row" id="typingRow">
+      <div class="msg-avatar typing-avatar">
+        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="10" y="20" width="44" height="34" rx="12" fill="white" opacity=".95"/>
+          <line x1="32" y1="20" x2="32" y2="10" stroke="white" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="32" cy="8" r="4" fill="#34d399"/>
+          <rect x="18" y="30" width="9" height="9" rx="3" fill="#1a7f5e"/>
+          <rect x="37" y="30" width="9" height="9" rx="3" fill="#1a7f5e"/>
+          <path d="M22 44 Q32 50 42 44" stroke="#1a7f5e" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+          <rect x="6" y="28" width="5" height="10" rx="3" fill="white" opacity=".7"/>
+          <rect x="53" y="28" width="5" height="10" rx="3" fill="white" opacity=".7"/>
+        </svg>
+      </div>
+      <div class="typing-dots">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Disclaimer -->
+  <p class="disclaimer">⚕️ For informational purposes only — not a substitute for professional medical advice.</p>
+
+  <!-- Footer input -->
+  <footer class="footer">
+    <form id="messageArea" autocomplete="off">
+      <div class="input-row">
+        <input type="text" id="text" name="msg" placeholder="Type your question…" required />
+        <button type="submit" class="send-btn" aria-label="Send">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+          </svg>
+        </button>
+      </div>
+    </form>
+  </footer>
+
+</div>
+
+<script>
+  const BOT_AVATAR = `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="10" y="20" width="44" height="34" rx="12" fill="white" opacity=".95"/>
+    <line x1="32" y1="20" x2="32" y2="10" stroke="white" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="32" cy="8" r="4" fill="#34d399"/>
+    <rect x="18" y="30" width="9" height="9" rx="3" fill="#1a7f5e"/>
+    <rect x="37" y="30" width="9" height="9" rx="3" fill="#1a7f5e"/>
+    <rect x="20" y="32" width="3" height="3" rx="1" fill="white" opacity=".6"/>
+    <rect x="39" y="32" width="3" height="3" rx="1" fill="white" opacity=".6"/>
+    <path d="M22 44 Q32 50 42 44" stroke="#1a7f5e" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+    <rect x="6" y="28" width="5" height="10" rx="3" fill="white" opacity=".7"/>
+    <rect x="53" y="28" width="5" height="10" rx="3" fill="white" opacity=".7"/>
+  </svg>`;
+
+  const USER_AVATAR = `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="32" cy="24" r="13" fill="#93c5fd"/>
+    <path d="M10 56c0-12.15 9.85-22 22-22s22 9.85 22 22" fill="#bfdbfe"/>
+  </svg>`;
+
+  const messagesEl = document.getElementById('messages');
+  const typingRow  = document.getElementById('typingRow');
+  const emptyState = document.getElementById('emptyState');
+  const form       = document.getElementById('messageArea');
+  const input      = document.getElementById('text');
+
+  function getTime() {
+    const d = new Date();
+    return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+  }
+
+  function escapeHtml(s) {
+    return s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function addMessage(text, role) {
+    if (emptyState) emptyState.style.display = 'none';
+
+    const row = document.createElement('div');
+    row.className = `msg-row ${role}`;
+
+    const avatarSvg = role === 'bot' ? BOT_AVATAR : USER_AVATAR;
+
+    row.innerHTML = `
+      <div class="msg-avatar">${avatarSvg}</div>
+      <div class="bubble">
+        ${escapeHtml(text)}
+        <span class="msg-time">${getTime()}</span>
+      </div>`;
+
+    messagesEl.appendChild(row);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function showTyping() {
+    typingRow.classList.add('visible');
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function hideTyping() {
+    typingRow.classList.remove('visible');
+  }
+
+  function sendMessage(text) {
+    if (!text.trim()) return;
+    addMessage(text, 'user');
+    showTyping();
+
+    $.ajax({
+      type: 'POST',
+      url: '/get',
+      data: { msg: text },
+    }).done(function(data) {
+      hideTyping();
+      addMessage(data, 'bot');
+    }).fail(function(xhr, status, error) {
+      hideTyping();
+      console.error('Request failed:', status, error);
+      addMessage("Sorry, I couldn't connect. Please try again.", 'bot');
+    });
+  }
+
+  // Form submit
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const text = input.value.trim();
+    input.value = '';
+    sendMessage(text);
+  });
+
+  // Chip buttons
+  document.getElementById('chipsBar').addEventListener('click', function(e) {
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    sendMessage(chip.dataset.msg);
+  });
+</script>
+
+</body>
+</html>

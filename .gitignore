@@ -6,3 +6,9 @@ venv/
 .venv/
 *.ipynb_checkpoints
 .vscode/"Research/" 
+.env
+__pycache__/
+*.pyc
+*.egg-info/
+*.mp3
+*.wav

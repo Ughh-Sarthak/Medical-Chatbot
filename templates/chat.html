@@ -6,7 +6,6 @@
   <title>MedBot — Your Health Assistant</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Fraunces:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
   <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}"/>
-  <!-- jQuery — required for $.ajax -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 </head>
 <body>
@@ -59,15 +58,13 @@
           <circle cx="32" cy="8" r="4" fill="#34d399"/>
           <rect x="18" y="30" width="9" height="9" rx="3" fill="white"/>
           <rect x="37" y="30" width="9" height="9" rx="3" fill="white"/>
-          <rect x="20" y="32" width="3" height="3" rx="1" fill="#1a7f5e" opacity=".5"/>
-          <rect x="39" y="32" width="3" height="3" rx="1" fill="#1a7f5e" opacity=".5"/>
           <path d="M22 44 Q32 50 42 44" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none"/>
           <rect x="6" y="28" width="5" height="10" rx="3" fill="#1a7f5e"/>
           <rect x="53" y="28" width="5" height="10" rx="3" fill="#1a7f5e"/>
         </svg>
       </div>
       <h2>How can I help today?</h2>
-      <p>Ask me about symptoms, medications, wellness tips, or any health question you have.</p>
+      <p>Ask me about symptoms, medications, wellness tips — or upload an image and speak your symptoms.</p>
     </div>
   </div>
 
@@ -86,10 +83,17 @@
           <rect x="53" y="28" width="5" height="10" rx="3" fill="white" opacity=".7"/>
         </svg>
       </div>
-      <div class="typing-dots">
-        <span></span><span></span><span></span>
-      </div>
+      <div class="typing-dots"><span></span><span></span><span></span></div>
     </div>
+  </div>
+
+  <!-- Image preview strip (shown when image is selected) -->
+  <div class="image-preview-wrap" id="imagePreviewWrap" style="display:none;">
+    <div class="image-preview-inner">
+      <img id="imagePreviewImg" src="" alt="Selected image"/>
+      <button class="img-remove-btn" id="removeImageBtn" title="Remove image">✕</button>
+    </div>
+    <span class="img-label">Medical image attached — speak or type your symptoms</span>
   </div>
 
   <!-- Disclaimer -->
@@ -97,9 +101,34 @@
 
   <!-- Footer input -->
   <footer class="footer">
+    <!-- Hidden file input -->
+    <input type="file" id="imageInput" accept="image/*" style="display:none"/>
+
     <form id="messageArea" autocomplete="off">
       <div class="input-row">
-        <input type="text" id="text" name="msg" placeholder="Type your question…" required />
+
+        <!-- Image upload button -->
+        <button type="button" class="icon-btn img-btn" id="imageBtn" title="Upload medical image" aria-label="Upload image">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3" y="3" width="18" height="18" rx="4" stroke="currentColor" stroke-width="2"/>
+            <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/>
+            <path d="M3 15l5-5 4 4 3-3 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+
+        <!-- Mic button -->
+        <button type="button" class="icon-btn mic-btn" id="micBtn" title="Hold to speak" aria-label="Record voice">
+          <svg class="mic-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="9" y="2" width="6" height="12" rx="3" fill="currentColor"/>
+            <path d="M5 10a7 7 0 0014 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <span class="mic-label" id="micLabel">Mic</span>
+        </button>
+
+        <input type="text" id="text" name="msg" placeholder="Type your question or speak…" />
+
         <button type="submit" class="send-btn" aria-label="Send">
           <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
@@ -112,6 +141,7 @@
 </div>
 
 <script>
+  // ── Avatars ────────────────────────────────────────────────────────────────
   const BOT_AVATAR = `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
     <rect x="10" y="20" width="44" height="34" rx="12" fill="white" opacity=".95"/>
     <line x1="32" y1="20" x2="32" y2="10" stroke="white" stroke-width="3" stroke-linecap="round"/>
@@ -130,85 +160,257 @@
     <path d="M10 56c0-12.15 9.85-22 22-22s22 9.85 22 22" fill="#bfdbfe"/>
   </svg>`;
 
-  const messagesEl = document.getElementById('messages');
-  const typingRow  = document.getElementById('typingRow');
-  const emptyState = document.getElementById('emptyState');
-  const form       = document.getElementById('messageArea');
-  const input      = document.getElementById('text');
+  // ── DOM refs ────────────────────────────────────────────────────────────────
+  const messagesEl       = document.getElementById('messages');
+  const typingRow        = document.getElementById('typingRow');
+  const emptyState       = document.getElementById('emptyState');
+  const form             = document.getElementById('messageArea');
+  const input            = document.getElementById('text');
+  const micBtn           = document.getElementById('micBtn');
+  const micLabel         = document.getElementById('micLabel');
+  const imageBtn         = document.getElementById('imageBtn');
+  const imageInput       = document.getElementById('imageInput');
+  const imagePreviewWrap = document.getElementById('imagePreviewWrap');
+  const imagePreviewImg  = document.getElementById('imagePreviewImg');
+  const removeImageBtn   = document.getElementById('removeImageBtn');
 
+  // ── State ───────────────────────────────────────────────────────────────────
+  let selectedImageFile = null;
+  let mediaRecorder     = null;
+  let audioChunks       = [];
+  let isRecording       = false;
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
   function getTime() {
     const d = new Date();
-    return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+    return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
   }
 
   function escapeHtml(s) {
-    return s
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-  }
-
-  function addMessage(text, role) {
-    if (emptyState) emptyState.style.display = 'none';
-
-    const row = document.createElement('div');
-    row.className = `msg-row ${role}`;
-
-    const avatarSvg = role === 'bot' ? BOT_AVATAR : USER_AVATAR;
-
-    row.innerHTML = `
-      <div class="msg-avatar">${avatarSvg}</div>
-      <div class="bubble">
-        ${escapeHtml(text)}
-        <span class="msg-time">${getTime()}</span>
-      </div>`;
-
-    messagesEl.appendChild(row);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
   function showTyping() {
     typingRow.classList.add('visible');
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
+  function hideTyping() { typingRow.classList.remove('visible'); }
 
-  function hideTyping() {
-    typingRow.classList.remove('visible');
+  function addMessage(text, role, extraHtml = '') {
+    if (emptyState) emptyState.style.display = 'none';
+    const row = document.createElement('div');
+    row.className = `msg-row ${role}`;
+    const avatarSvg = role === 'bot' ? BOT_AVATAR : USER_AVATAR;
+    row.innerHTML = `
+      <div class="msg-avatar">${avatarSvg}</div>
+      <div class="bubble">
+        ${extraHtml}${escapeHtml(text)}
+        <span class="msg-time">${getTime()}</span>
+      </div>`;
+    messagesEl.appendChild(row);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
-  function sendMessage(text) {
+  function addImageMessage(imgSrc, caption) {
+    if (emptyState) emptyState.style.display = 'none';
+    const row = document.createElement('div');
+    row.className = 'msg-row user';
+    row.innerHTML = `
+      <div class="msg-avatar">${USER_AVATAR}</div>
+      <div class="bubble bubble-img">
+        <img src="${imgSrc}" class="msg-image" alt="uploaded"/>
+        ${caption ? `<span class="img-caption">${escapeHtml(caption)}</span>` : ''}
+        <span class="msg-time">${getTime()}</span>
+      </div>`;
+    messagesEl.appendChild(row);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  // ── Speak bot response via /speak ────────────────────────────────────────────
+  function speakText(text) {
+    fetch('/speak', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({text})
+    })
+    .then(r => r.blob())
+    .then(blob => {
+      const url    = URL.createObjectURL(blob);
+      const audio  = new Audio(url);
+      // Show audio player in the last bot bubble
+      const bubbles = messagesEl.querySelectorAll('.msg-row.bot .bubble');
+      const last    = bubbles[bubbles.length - 1];
+      if (last) {
+        const player = document.createElement('audio');
+        player.controls = true;
+        player.src      = url;
+        player.className = 'bubble-audio';
+        last.appendChild(player);
+      }
+      audio.play();
+    })
+    .catch(err => console.warn('TTS error:', err));
+  }
+
+  // ── Text send (RAG pipeline) ────────────────────────────────────────────────
+  function sendTextMessage(text) {
     if (!text.trim()) return;
     addMessage(text, 'user');
     showTyping();
-
-    $.ajax({
-      type: 'POST',
-      url: '/get',
-      data: { msg: text },
-    }).done(function(data) {
-      hideTyping();
-      addMessage(data, 'bot');
-    }).fail(function(xhr, status, error) {
-      hideTyping();
-      console.error('Request failed:', status, error);
-      addMessage("Sorry, I couldn't connect. Please try again.", 'bot');
-    });
+    $.ajax({ type:'POST', url:'/get', data:{msg: text} })
+      .done(data => { hideTyping(); addMessage(data, 'bot'); speakText(data); })
+      .fail(() => { hideTyping(); addMessage("Sorry, I couldn't connect. Please try again.", 'bot'); });
   }
 
-  // Form submit
+  // ── Image analysis ──────────────────────────────────────────────────────────
+  function sendImageMessage(imageFile, query) {
+    const objUrl = URL.createObjectURL(imageFile);
+    addImageMessage(objUrl, query || 'Medical image');
+    showTyping();
+
+    const fd = new FormData();
+    fd.append('image', imageFile);
+    if (query) fd.append('query', query);
+
+    fetch('/analyze_image', { method:'POST', body: fd })
+      .then(r => r.json())
+      .then(data => {
+        hideTyping();
+        const answer = data.answer || data.error || 'No response.';
+        addMessage(answer, 'bot');
+        speakText(answer);
+      })
+      .catch(() => { hideTyping(); addMessage('Image analysis failed. Please try again.', 'bot'); });
+  }
+
+  // ── Form submit ─────────────────────────────────────────────────────────────
   form.addEventListener('submit', function(e) {
     e.preventDefault();
     const text = input.value.trim();
     input.value = '';
-    sendMessage(text);
+
+    if (selectedImageFile) {
+      sendImageMessage(selectedImageFile, text);
+      clearImage();
+    } else if (text) {
+      sendTextMessage(text);
+    }
   });
 
-  // Chip buttons
+  // ── Chip buttons ────────────────────────────────────────────────────────────
   document.getElementById('chipsBar').addEventListener('click', function(e) {
     const chip = e.target.closest('.chip');
     if (!chip) return;
-    sendMessage(chip.dataset.msg);
+    sendTextMessage(chip.dataset.msg);
   });
+
+  // ── Image selection ─────────────────────────────────────────────────────────
+  imageBtn.addEventListener('click', () => imageInput.click());
+
+  imageInput.addEventListener('change', function() {
+    const file = this.files[0];
+    if (!file) return;
+    selectedImageFile = file;
+    const reader = new FileReader();
+    reader.onload = e => {
+      imagePreviewImg.src = e.target.result;
+      imagePreviewWrap.style.display = 'flex';
+    };
+    reader.readAsDataURL(file);
+    this.value = '';
+  });
+
+  removeImageBtn.addEventListener('click', clearImage);
+
+  function clearImage() {
+    selectedImageFile = null;
+    imagePreviewWrap.style.display = 'none';
+    imagePreviewImg.src = '';
+  }
+
+  // ── Microphone (push-to-talk) ───────────────────────────────────────────────
+  micBtn.addEventListener('click', async function() {
+    if (isRecording) {
+      // Stop recording
+      stopRecording();
+    } else {
+      // Start recording
+      await startRecording();
+    }
+  });
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunks  = [];
+      mediaRecorder = new MediaRecorder(stream);
+
+      mediaRecorder.ondataavailable = e => {
+        if (e.data.size > 0) audioChunks.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        const blob = new Blob(audioChunks, { type: 'audio/webm' });
+        stream.getTracks().forEach(t => t.stop());
+        await transcribeAudio(blob);
+      };
+
+      mediaRecorder.start();
+      isRecording = true;
+      micBtn.classList.add('recording');
+      micLabel.textContent = 'Stop';
+    } catch (err) {
+      console.error('Mic error:', err);
+      addMessage('Microphone access denied. Please allow microphone permissions.', 'bot');
+    }
+  }
+
+  function stopRecording() {
+    if (mediaRecorder && isRecording) {
+      mediaRecorder.stop();
+      isRecording = false;
+      micBtn.classList.remove('recording');
+      micLabel.textContent = 'Mic';
+    }
+  }
+
+  async function transcribeAudio(blob) {
+    micBtn.disabled = true;
+    micLabel.textContent = '…';
+    showTyping();
+
+    const fd = new FormData();
+    fd.append('audio', blob, 'voice.webm');
+
+    try {
+      const res  = await fetch('/transcribe', { method:'POST', body: fd });
+      const data = await res.json();
+      hideTyping();
+
+      if (data.text) {
+        input.value = data.text;
+        // If image is attached, run vision; otherwise run RAG
+        if (selectedImageFile) {
+          sendImageMessage(selectedImageFile, data.text);
+          clearImage();
+          input.value = '';
+        } else {
+          // Auto-send transcribed text
+          const text = data.text.trim();
+          input.value = '';
+          sendTextMessage(text);
+        }
+      } else {
+        addMessage('Could not transcribe audio. Please try again.', 'bot');
+      }
+    } catch (err) {
+      hideTyping();
+      addMessage('Transcription failed. Check your connection.', 'bot');
+    } finally {
+      micBtn.disabled = false;
+      micLabel.textContent = 'Mic';
+    }
+  }
 </script>
 
 </body>

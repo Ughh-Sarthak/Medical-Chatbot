@@ -18,19 +18,19 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+          aws-region: us-east-1
 
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build Docker image
-        run: docker build -t medibot .
+        run: docker build -t medicalchatbot .
 
       - name: Tag Docker image
-        run: docker tag medibot:latest ${{ secrets.ECR_REPO }}:latest
+        run: docker tag medicalchatbot:latest ${{ secrets.ECR_REPOSITORY }}:latest
 
       - name: Push image to ECR
-        run: docker push ${{ secrets.ECR_REPO }}:latest
+        run: docker push ${{ secrets.ECR_REPOSITORY }}:latest
 
 
   deploy-to-ec2:
@@ -45,16 +45,18 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_KEY }}
           script: |
+
             docker stop medibot || true
             docker rm medibot || true
 
-            aws ecr get-login-password --region ${{ secrets.AWS_DEFAULT_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REPO }}
+            aws ecr get-login-password --region us-east-1 | \
+            docker login --username AWS --password-stdin 8***********.dkr.ecr.us-east-1.amazonaws.com
 
-            docker pull ${{ secrets.ECR_REPO }}:latest
+            docker pull ${{ secrets.ECR_REPOSITORY }}:latest
 
             docker run -d -p 8080:8080 \
               -e PINECONE_API_KEY=${{ secrets.PINECONE_API_KEY }} \
               -e GROQ_API_KEY=${{ secrets.GROQ_API_KEY }} \
               -e GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }} \
               --name medibot \
-              ${{ secrets.ECR_REPO }}:latest
+              ${{ secrets.ECR_REPOSITORY }}:latest

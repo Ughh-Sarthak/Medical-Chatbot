@@ -15,12 +15,17 @@ from gtts import gTTS
 from google.genai import types
 import logging
 
+# ── Flask App & Environment ─────────────────────────────
 app = Flask(__name__)
 load_dotenv()
-
 logging.basicConfig(level=logging.INFO)
 
-# ── API Keys ────────────────────────────────────────────────────────────────
+# ── Rate Limiting ───────────────────────────────────────
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+limiter = Limiter(app, key_func=get_remote_address, default_limits=["30 per hour"])  # adjust as needed
+
+# ── API Keys ─────────────────────────────────────────────
 PINECONE_API_KEY = os.environ.get('PINECONE_API_KEY')
 GROQ_API_KEY     = os.environ.get('GROQ_API_KEY')
 GEMINI_API_KEY   = os.environ.get('GEMINI_API_KEY')
@@ -28,10 +33,10 @@ GEMINI_API_KEY   = os.environ.get('GEMINI_API_KEY')
 os.environ["PINECONE_API_KEY"] = PINECONE_API_KEY
 os.environ["GROQ_API_KEY"]     = GROQ_API_KEY
 
-# ── Gemini client (voice + vision) ──────────────────────────────────────────
+# ── Gemini client (voice + vision) ──────────────────────
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
-# ── RAG pipeline (text Q&A) ─────────────────────────────────────────────────
+# ── RAG pipeline (text Q&A) ─────────────────────────────
 embeddings = download_hugging_face_embeddings()
 
 docsearch = PineconeVectorStore.from_existing_index(
@@ -57,23 +62,21 @@ rag_chain = (
     | StrOutputParser()
 )
 
-
-# ── Vision system prompt ─────────────────────────────────────────────────────
+# ── Vision system prompt ────────────────────────────────
 VISION_SYSTEM_PROMPT = """You are a professional medical assistant helping analyze medical images.
 What do you observe in this image medically? If you identify any conditions, suggest possible 
 diagnoses and general remedies. Do not use special characters or markdown formatting.
 Respond in one clear paragraph as if speaking directly to a patient.
 Start with 'Based on what I can see...' Keep your answer concise (2-3 sentences)."""
 
-
-# ── Routes ───────────────────────────────────────────────────────────────────
-
+# ── Routes ─────────────────────────────────────────────
 @app.route("/")
 def index():
     return render_template('chat.html')
 
 
 @app.route("/get", methods=["POST"])
+@limiter.limit("30 per hour")  # Rate limit chat requests
 def chat():
     """Handle plain-text messages via RAG pipeline."""
     try:
@@ -89,6 +92,7 @@ def chat():
 
 
 @app.route("/transcribe", methods=["POST"])
+@limiter.limit("30 per hour")  # Rate limit audio requests
 def transcribe():
     """Transcribe uploaded audio using Gemini STT."""
     try:
@@ -96,7 +100,6 @@ def transcribe():
             return jsonify({"error": "No audio file"}), 400
 
         audio_file = request.files['audio']
-        # Save to a temp file
         suffix = os.path.splitext(audio_file.filename)[-1] or ".webm"
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             audio_file.save(tmp.name)
@@ -106,13 +109,10 @@ def transcribe():
             audio_data = base64.standard_b64encode(f.read()).decode("utf-8")
         os.unlink(tmp_path)
 
-        # Detect mime type
         mime = "audio/webm"
         if suffix == ".mp3":  mime = "audio/mpeg"
         elif suffix == ".wav": mime = "audio/wav"
         elif suffix == ".ogg": mime = "audio/ogg"
-
-        from google.genai import types
 
         result = gemini_client.models.generate_content(
             model="gemini-2.5-flash",
@@ -131,6 +131,7 @@ def transcribe():
 
 
 @app.route("/analyze_image", methods=["POST"])
+@limiter.limit("10 per hour")  # Rate limit heavy image analysis
 def analyze_image():
     """Analyze an uploaded medical image using Gemini Vision."""
     try:
@@ -141,19 +142,18 @@ def analyze_image():
         image_bytes = image_file.read()
         image_b64   = base64.b64encode(image_bytes).decode("utf-8")
 
-        # Optional: also include the patient's typed/spoken query
         patient_query = request.form.get("query", "").strip()
         full_prompt   = VISION_SYSTEM_PROMPT
         if patient_query:
             full_prompt += f"\n\nPatient describes: {patient_query}"
 
         result = gemini_client.models.generate_content(
-        model="gemini-2.5-flash",
-         contents=[
-        full_prompt,
-        types.Part.from_bytes(data=base64.b64decode(image_b64), mime_type="image/jpeg")
-        ]
-    )
+            model="gemini-2.5-flash",
+            contents=[
+                full_prompt,
+                types.Part.from_bytes(data=base64.b64decode(image_b64), mime_type="image/jpeg")
+            ]
+        )
         answer = result.text.strip()
         logging.info(f"[VISION] {answer}")
         return jsonify({"answer": answer})
@@ -164,6 +164,7 @@ def analyze_image():
 
 
 @app.route("/speak", methods=["POST"])
+@limiter.limit("30 per hour")  # Rate limit TTS requests
 def speak():
     """Convert text to speech using gTTS and return the MP3."""
     try:
@@ -186,5 +187,6 @@ def speak():
         return jsonify({"error": str(e)}), 500
 
 
+# ── Run Server ─────────────────────────────────────────
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=8080, debug=True)

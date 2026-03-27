@@ -20,10 +20,16 @@ app = Flask(__name__)
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
 
-# ── Rate Limiting ───────────────────────────────────────
+# ── Rate Limiting (FIXED for latest flask-limiter) ───────
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-limiter = Limiter(app, key_func=get_remote_address, default_limits=["30 per hour"])  # adjust as needed
+
+# Correct initialization for newer versions of flask-limiter
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["30 per hour"]
+)
+limiter.init_app(app)   # ← This is the important part
 
 # ── API Keys ─────────────────────────────────────────────
 PINECONE_API_KEY = os.environ.get('PINECONE_API_KEY')
@@ -76,7 +82,7 @@ def index():
 
 
 @app.route("/get", methods=["POST"])
-@limiter.limit("30 per hour")  # Rate limit chat requests
+@limiter.limit("30 per hour")
 def chat():
     """Handle plain-text messages via RAG pipeline."""
     try:
@@ -92,7 +98,7 @@ def chat():
 
 
 @app.route("/transcribe", methods=["POST"])
-@limiter.limit("30 per hour")  # Rate limit audio requests
+@limiter.limit("30 per hour")
 def transcribe():
     """Transcribe uploaded audio using Gemini STT."""
     try:
@@ -131,7 +137,7 @@ def transcribe():
 
 
 @app.route("/analyze_image", methods=["POST"])
-@limiter.limit("10 per hour")  # Rate limit heavy image analysis
+@limiter.limit("10 per hour")
 def analyze_image():
     """Analyze an uploaded medical image using Gemini Vision."""
     try:
@@ -164,7 +170,7 @@ def analyze_image():
 
 
 @app.route("/speak", methods=["POST"])
-@limiter.limit("30 per hour")  # Rate limit TTS requests
+@limiter.limit("30 per hour")
 def speak():
     """Convert text to speech using gTTS and return the MP3."""
     try:

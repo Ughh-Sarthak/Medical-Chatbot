@@ -25,10 +25,8 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
 # Correct initialization for newer versions of flask-limiter
-limiter = Limiter(
-    key_func=get_remote_address,
-    default_limits=["30 per hour"]
-)
+# New (correct)
+limiter = Limiter(key_func=get_remote_address, default_limits=["30 per hour"])
 limiter.init_app(app)   # ← This is the important part
 
 # ── API Keys ─────────────────────────────────────────────
